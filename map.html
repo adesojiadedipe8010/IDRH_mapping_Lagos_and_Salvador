@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Urban Heritage Map</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:    #1a1208;
+      --paper:  #f5efe2;
+      --rust:   #b94a1c;
+      --gold:   #c9943a;
+      --moss:   #3d5a3e;
+      --mist:   rgba(245,239,226,0.92);
+    }
+
+    body {
+      background: var(--ink);
+      font-family: 'DM Mono', monospace;
+      color: var(--ink);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--ink);
+      padding: 14px 24px 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 18px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #3a2e1a;
+    }
+
+    header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.35rem;
+      color: var(--paper);
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    header span {
+      font-size: 0.65rem;
+      color: var(--gold);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 300;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+    }
+
+    /* ── Popup shell ── */
+    .leaflet-popup-content-wrapper {
+      background: var(--mist);
+      border: 1px solid var(--gold);
+      border-radius: 2px;
+      box-shadow: 4px 6px 24px rgba(0,0,0,0.45);
+      padding: 0;
+      min-width: 260px;
+      max-width: 320px;
+    }
+
+    .leaflet-popup-tip {
+      background: var(--gold);
+    }
+
+    .leaflet-popup-content {
+      margin: 0 !important;
+    }
+
+    .popup-inner {
+      padding: 18px 20px 16px;
+    }
+
+    .popup-date {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--rust);
+      margin-bottom: 4px;
+      font-weight: 400;
+    }
+
+    .popup-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+
+    .popup-city {
+      font-size: 0.65rem;
+      color: var(--moss);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .popup-divider {
+      border: none;
+      border-top: 1px solid var(--gold);
+      margin: 10px 0;
+      opacity: 0.5;
+    }
+
+    .popup-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--rust);
+      margin-bottom: 2px;
+    }
+
+    .popup-text {
+      font-size: 0.78rem;
+      color: var(--ink);
+      line-height: 1.55;
+      margin-bottom: 10px;
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+    }
+
+    .popup-text:last-child { margin-bottom: 0; }
+
+    /* ── Custom marker ── */
+    .custom-marker {
+      width: 14px;
+      height: 14px;
+      background: var(--rust);
+      border: 2px solid var(--paper);
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px var(--rust), 0 3px 10px rgba(0,0,0,0.5);
+      transition: transform 0.15s ease;
+      cursor: pointer;
+    }
+
+    .custom-marker:hover {
+      transform: scale(1.4);
+    }
+
+    /* ── Map tile tint overlay ── */
+    .leaflet-tile {
+      filter: sepia(30%) brightness(0.88) contrast(1.05);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Urban Heritage Atlas</h1>
+  <span>Lagos &amp; Salvador Bahia</span>
+</header>
+
+<div id="map"></div>
+
+<script>
+  const points = [
+    {
+      lat: 6.42967, lng: 3.42301,
+      name: "Victoria Island",
+      date: "1948",
+      significance: "LEDB acquired",
+      city: "Lagos",
+      verbose: "GRA marked in 1920's"
+    },
+    {
+      lat: 6.46759, lng: 3.38749,
+      name: "Carter Bridge",
+      date: "1901",
+      significance: "Built to connect the island and mainland",
+      city: "Lagos",
+      verbose: "Rebuilt in 1930's"
+    },
+    {
+      lat: 6.44047, lng: 3.90505,
+      name: "Oke Popo",
+      date: "1852",
+      significance: "Brazilian returnees quarters",
+      city: "Lagos",
+      verbose: "Afro Brazilian returnees land provided by Oba Ojulari"
+    },
+    {
+      lat: 6.48419, lng: 3.38607,
+      name: "Ebute Meta",
+      date: "1956",
+      significance: "LEDB relocated people there during slum clearance",
+      city: "Lagos",
+      verbose: "After demolitions in central Lagos the area received people"
+    },
+    {
+      lat: -12.98664, lng: -38.52276,
+      name: "Gamboa de Baixo",
+      date: "1962",
+      significance: "Physical separation from upper city",
+      city: "Salvador Bahia",
+      verbose: "Constantly facing threats of eviction to pave way for construction of tourism projects"
+    },
+    {
+      lat: 6.61804, lng: 3.32025,
+      name: "Agege",
+      date: "Late 19th century",
+      significance: "Establishment of railway to pass through",
+      city: "Lagos",
+      verbose: "Accelerated the growth of the area"
+    },
+    {
+      lat: -12.97364, lng: -38.51,
+      name: "Pelourinho",
+      date: "1991",
+      significance: "Gentrified for tourism",
+      city: "Salvador Bahia",
+      verbose: "Afro Brazilians forced out. UNESCO Heritage site"
+    },
+    {
+      lat: -13.01331, lng: -38.49002,
+      name: "Rio Vermelho",
+      date: "Late 19th century",
+      significance: "Integrated into urban space of Salvador",
+      city: "Salvador Bahia",
+      verbose: "Used to be a fishing village, now known for worship of Yemanjá in Candomblé"
+    },
+    {
+      lat: -12.97425, lng: -38.51241,
+      name: "Elevador Lacerda",
+      date: "1873 (converted to electricity 1906)",
+      significance: "Public elevator to connect upper city and lower city",
+      city: "Salvador Bahia",
+      verbose: "Spatial segregation marker"
+    }
+  ];
+
+  const map = L.map('map', {
+    center: [0, -10],
+    zoom: 3,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(map);
+
+  const markerIcon = L.divIcon({
+    className: '',
+    html: '<div class="custom-marker"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -10]
+  });
+
+  points.forEach(p => {
+    const popupHTML = `
+      <div class="popup-inner">
+        <div class="popup-date">${p.date}</div>
+        <div class="popup-name">${p.name}</div>
+        ${p.city ? `<div class="popup-city">${p.city}</div>` : ''}
+        <hr class="popup-divider"/>
+        <div class="popup-label">Significance</div>
+        <div class="popup-text">${p.significance}</div>
+        <div class="popup-label">Notes</div>
+        <div class="popup-text">${p.verbose}</div>
+      </div>`;
+
+    L.marker([p.lat, p.lng], { icon: markerIcon })
+      .bindPopup(popupHTML, { maxWidth: 320, minWidth: 260 })
+      .addTo(map);
+  });
+</script>
+</body>
+</html>
