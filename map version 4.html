@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title> Segregation in Urban Spaces Lagos and Salvador </title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:    #1a1208;
+      --paper:  #f5efe2;
+      --rust:   #b94a1c;
+      --gold:   #c9943a;
+      --moss:   #3d5a3e;
+      --mist:   rgba(245,239,226,0.92);
+    }
+
+    body {
+      background: var(--ink);
+      font-family: 'DM Mono', monospace;
+      color: var(--ink);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--ink);
+      padding: 14px 24px 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 18px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #3a2e1a;
+      z-index: 1000;
+    }
+
+    header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.35rem;
+      color: var(--paper);
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    header span {
+      font-size: 0.65rem;
+      color: var(--gold);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 300;
+    }
+
+    /* Split Screen Container */
+    .map-container {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      background: var(--ink);
+    }
+
+    .map-half {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Border between maps */
+    #mapLagos {
+      border-right: 1px solid var(--gold);
+    }
+
+    /* Popup & Marker Styles remain the same */
+    .leaflet-popup-content-wrapper {
+      background: var(--mist);
+      border: 1px solid var(--gold);
+      border-radius: 2px;
+      box-shadow: 4px 6px 24px rgba(0,0,0,0.45);
+      padding: 0;
+      min-width: 260px;
+    }
+    .leaflet-popup-tip { background: var(--gold); }
+    .leaflet-popup-content { margin: 0 !important; }
+    .popup-inner { padding: 18px 20px 16px; }
+    .popup-date { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--rust); margin-bottom: 4px; }
+    .popup-name { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--ink); line-height: 1.25; margin-bottom: 4px; }
+    .popup-city { font-size: 0.65rem; color: var(--moss); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
+    .popup-divider { border: none; border-top: 1px solid var(--gold); margin: 10px 0; opacity: 0.5; }
+    .popup-label { font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--rust); margin-bottom: 2px; }
+    .popup-text { font-size: 0.78rem; color: var(--ink); line-height: 1.55; margin-bottom: 10px; font-weight: 300; }
+    
+    .custom-marker {
+      width: 14px; height: 14px; background: var(--rust);
+      border: 2px solid var(--paper); border-radius: 50%;
+      box-shadow: 0 0 0 2px var(--rust), 0 3px 10px rgba(0,0,0,0.5);
+      transition: transform 0.15s ease; cursor: pointer;
+    }
+    .custom-marker:hover { transform: scale(1.4); }
+    .leaflet-tile { filter: sepia(30%) brightness(0.88) contrast(1.05); }
+
+    /* City Labels overlaid on maps */
+    .city-label {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: var(--mist);
+      padding: 5px 12px;
+      border: 1px solid var(--gold);
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Segregation in Urban Spaces </h1>
+  <span>Lagos &amp; Salvador</span>
+</header>
+
+<div class="map-container">
+  <div id="mapLagos" class="map-half">
+    <div class="city-label">Lagos, Nigeria</div>
+  </div>
+  <div id="mapSalvador" class="map-half">
+    <div class="city-label">Salvador, Brazil</div>
+  </div>
+</div>
+
+<script>
+  const points = [
+    { lat: 6.42967, lng: 3.42301, name: "Victoria Island", date: "1948", significance: "Lagos Executive Development Board acquired the area.", city: "Lagos", verbose: "The area got marked as a Government Reserved Area (GRA) in the 1920's." },
+    { lat: 6.46759, lng: 3.38749, name: "Carter Bridge", date: "1901", significance: "First bridge built to connect the island and mainland parts of Lagos.", city: "Lagos", verbose: "It was rebuilt in the 1930's." },
+    { lat: 6.44047, lng: 3.40505, name: "Oke Popo", date: "1852", significance: "This area housed the Brazilian returnees quarters.", city: "Lagos", verbose: "The Afro-Brazilian returnees got the land provided by the King Oba Ojulari." },
+    { lat: 6.48419, lng: 3.38607, name: "Ebute Metta", date: "1956", significance: "LEDB relocated people here during slum clearance of the 1950's.", city: "Lagos", verbose: "The area received people after demolitions in central Lagos." },
+    { lat: -12.98664, lng: -38.52276, name: "Gamboa de Baixo", date: "1962", significance: "Construction of Avenida Lafayete Coutinho physically separated this area from the upper city.", city: "Salvador Bahia", verbose: "A working-class coastal community facing threats of eviction for tourism projects." },
+    { lat: 6.61804, lng: 3.32025, name: "Agege", date: "Late 19th Century", significance: "Establishment of British railways led to accelerated economic development.", city: "Lagos", verbose: "Historic residential and commercial area originally settled by indigenous Awori-Yoruba." },
+    { lat: -12.97364, lng: -38.51, name: "Pelourinho", date: "1985", significance: "Became a UNESCO Heritage site.", city: "Salvador Bahia", verbose: "Gentrified in the 1990's for tourism after many Afro-Brazilians were displaced." },
+    { lat: -13.01331, lng: -38.49002, name: "Rio Vermelho", date: "Late 19th Century", significance: "Integrated into the urban space of Salvador.", city: "Salvador Bahia", verbose: "Former fishing village now known for worship of Yemanjá in Candomblé." },
+    { lat: -12.97425, lng: -38.51241, name: "Elevador Lacerda", date: "1873 / 1906", significance: "Public elevator connecting the upper and lower city.", city: "Salvador Bahia", verbose: "Both a spatial segregation marker and a connector for both sides of the city." }
+  ];
+
+  // Initialize Lagos Map
+  const mapLagos = L.map('mapLagos').setView([6.48, 3.38], 11);
+  
+  // Initialize Salvador Map
+  const mapSalvador = L.map('mapSalvador').setView([-12.97, -38.50], 12);
+
+  // Common Tile Layer setup
+  const tilesUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const attribution = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
+  L.tileLayer(tilesUrl, { attribution, maxZoom: 19 }).addTo(mapLagos);
+  L.tileLayer(tilesUrl, { attribution, maxZoom: 19 }).addTo(mapSalvador);
+
+  const markerIcon = L.divIcon({
+    className: '',
+    html: '<div class="custom-marker"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -10]
+  });
+
+  // Function to add markers to specific maps
+  points.forEach(p => {
+    const popupHTML = `
+      <div class="popup-inner">
+        <div class="popup-date">${p.date}</div>
+        <div class="popup-name">${p.name}</div>
+        <div class="popup-city">${p.city}</div>
+        <hr class="popup-divider"/>
+        <div class="popup-label">Significance</div>
+        <div class="popup-text">${p.significance}</div>
+        <div class="popup-label">Notes</div>
+        <div class="popup-text">${p.verbose}</div>
+      </div>`;
+
+    const targetMap = p.city === "Lagos" ? mapLagos : mapSalvador;
+
+    L.marker([p.lat, p.lng], { icon: markerIcon })
+      .bindPopup(popupHTML, { maxWidth: 320, minWidth: 260 })
+      .addTo(targetMap);
+  });
+</script>
+</body>
+</html>
